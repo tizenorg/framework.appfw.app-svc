@@ -22,17 +22,12 @@ MESSAGE("Build type: ${CMAKE_BUILD_TYPE}")
 # Set required packages
 INCLUDE(FindPkgConfig)
 
-pkg_check_modules(pkgs REQUIRED dlog ecore x11 libprivilege-control aul)
-pkg_check_modules(libpkgs REQUIRED dlog bundle dbus-glib-1 ail xdgmime aul glib-2.0 ecore-x ecore libsoup-2.4 iniparser pkgmgr-info)
+pkg_check_modules(libpkgs REQUIRED dlog bundle dbus-glib-1 xdgmime aul glib-2.0 ecore-x ecore iniparser pkgmgr-info vconf)
 
 FIND_LIBRARY(LIB_DL dl)
 
 FOREACH(flag ${libpkgs_CFLAGS})
 	SET(EXTRA_CFLAGS "${EXTRA_CFLAGS} ${flag}")
-ENDFOREACH(flag)
-
-FOREACH(flag ${pkgs_CFLAGS})
-	SET(TEST_CFLAGS "${TEST_CFLAGS} ${flag}")
 ENDFOREACH(flag)
 
 # Compiler flags
@@ -47,7 +42,6 @@ SET(CMAKE_C_FLAGS_RELEASE "-O2")
 SET(CMAKE_SKIP_BUILD_RPATH true)
 
 # Get uname value to set 'TARGET' definition 
-# TODO: Is this needed?
 FIND_PROGRAM(UNAME NAMES uname)
 EXEC_PROGRAM("${UNAME}" ARGS "-m" OUTPUT_VARIABLE "ARCH")
 IF("${ARCH}" STREQUAL "arm")
@@ -57,20 +51,25 @@ ENDIF("${ARCH}" STREQUAL "arm")
 
 ADD_DEFINITIONS("-DPREFIX=\"${CMAKE_INSTALL_PREFIX}\"")
 ADD_DEFINITIONS("-DRW_DATA_PREFIX=\"/opt/share\"")
+IF(_APPFW_FEATURE_MULTI_INSTANCE)
+	ADD_DEFINITIONS("-D_APPFW_FEATURE_MULTI_INSTANCE")
+ENDIF(_APPFW_FEATURE_MULTI_INSTANCE)
+IF(_APPFW_FEATURE_MULTI_WINDOW)
+        ADD_DEFINITIONS("-D_APPFW_FEATURE_MULTI_WINDOW")
+ENDIF(_APPFW_FEATURE_MULTI_WINDOW)
 
 # Linker flags
 SET(CMAKE_EXE_LINKER_FLAGS "-Wl,--as-needed")
 
-
 ### Build ###
-
 
 # aul
 add_library(appsvc SHARED
 		src/appsvc.c
 		src/appsvc_db.c
 		)
-target_link_libraries(appsvc ${libpkgs_LDFLAGS})
+TARGET_LINK_LIBRARIES(appsvc "-ldl")
+TARGET_LINK_LIBRARIES(appsvc ${libpkgs_LDFLAGS})
 SET_TARGET_PROPERTIES(appsvc PROPERTIES SOVERSION ${VERSION_MAJOR})
 SET_TARGET_PROPERTIES(appsvc PROPERTIES VERSION ${VERSION})
 

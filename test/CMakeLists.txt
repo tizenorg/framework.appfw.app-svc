@@ -1,10 +1,17 @@
 # Test executables
+
+pkg_check_modules(pkgs REQUIRED dlog ecore x11 libprivilege-control aul)
+
+FOREACH(flag ${pkgs_CFLAGS})
+	SET(TEST_CFLAGS "${TEST_CFLAGS} ${flag}")
+ENDFOREACH(flag)
+
 SET(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} ${TEST_CFLAGS}")
 
 add_executable(appsvc_test
 		appsvc_test.c) 
 target_link_libraries(appsvc_test appsvc ${pkgs_LDFLAGS})
-INSTALL(TARGETS appsvc_test DESTINATION bin)
+INSTALL(TARGETS appsvc_test DESTINATION /opt/usr/devel)
 
 
 ### Unit tests ###

@@ -30,7 +30,7 @@
 
 
 #define SVC_DB_PATH	"/opt/dbspace/.appsvc.db"
-#define APP_INFO_DB_PATH	"/opt/dbspace/.app_info.db"
+#define APP_INFO_DB_PATH	"/opt/dbspace/.pkgmgr_parser.db"
 
 #define QUERY_MAX_LEN	8192
 #define URI_MAX_LEN	4096
@@ -57,20 +57,21 @@ static int __init(void)
 
 	rc = sqlite3_open(SVC_DB_PATH, &svc_db);
 	if(rc) {
-		_E("Can't open database: %s", sqlite3_errmsg(svc_db));
+		_E("Can't open database: %d, %s, extended: %d", rc, sqlite3_errmsg(svc_db), sqlite3_extended_errcode(svc_db));
 		goto err;
 	}
 
 	// Enable persist journal mode
 	rc = sqlite3_exec(svc_db, "PRAGMA journal_mode = PERSIST", NULL, NULL, NULL);
 	if(SQLITE_OK!=rc){
-		_D("Fail to change journal mode\n");
+		_E("Fail to change journal mode\n");
 		goto err;
 	}
 
 	return 0;
 err:
 	sqlite3_close(svc_db);
+	svc_db = NULL;
 	return -1;
 }
 
@@ -99,6 +100,13 @@ static int __collate_appsvc(void *ucol, int str1_len, const void *str1, int str2
 	in_uri = strtok_r(NULL, "|", &saveptr1);
 	in_mime = strtok_r(NULL, "|", &saveptr1);
 
+	if(!(in_op && in_uri && in_mime)) {
+		_D("op(%s) uri(%s) mime(%s)", in_op, in_uri, in_mime);
+		free(dup_str1);
+		free(dup_str2);
+		return -1;
+	}
+
 	token = strtok_r(dup_str1, ";", &saveptr1);
 
 	if(token == NULL) {
@@ -112,6 +120,11 @@ static int __collate_appsvc(void *ucol, int str1_len, const void *str1, int str2
 		op = strtok_r(token, "|", &saveptr2);
 		uri = strtok_r(NULL, "|", &saveptr2);
 		mime = strtok_r(NULL, "|", &saveptr2);
+
+		if(!(op && uri && mime)) {
+			_D("op(%s) uri(%s) mime(%s)", op, uri, mime);
+			continue;
+		}
 
 		if( (strcmp(op, in_op) == 0) && (strcmp(mime, in_mime) == 0) ) {
 			SECURE_LOGD("%s %s %s %s %s %s", op, in_op, mime, in_mime, uri, in_uri);
@@ -133,7 +146,7 @@ static int __collate_appsvc(void *ucol, int str1_len, const void *str1, int str2
 				}
 			}
 		}
-	} while(token = strtok_r(NULL, ";", &saveptr1));
+	} while( (token = strtok_r(NULL, ";", &saveptr1)) );
 
 	free(dup_str1);
 	free(dup_str2);
@@ -152,7 +165,7 @@ static int __init_app_info_db(void)
 
 	rc = sqlite3_open(APP_INFO_DB_PATH, &app_info_db);
 	if(rc) {
-		_E("Can't open database: %s", sqlite3_errmsg(app_info_db));
+		_E("Can't open database: %d, %s, extended: %d", rc, sqlite3_errmsg(app_info_db), sqlite3_extended_errcode(app_info_db));
 		goto err;
 	}
 
@@ -169,6 +182,7 @@ static int __init_app_info_db(void)
 	return 0;
 err:
 	sqlite3_close(app_info_db);
+	app_info_db = NULL;
 	return -1;
 }
 
@@ -187,8 +201,9 @@ int _svc_db_add_app(const char *op, const char *mime_type, const char *uri, cons
 {
 	char m[BUF_MAX_LEN];
 	char u[URI_MAX_LEN];
-	char *query;
-	char* error_message = NULL;
+	const char insert_query[] = "insert into appsvc( operation, mime_type, uri, pkg_name) values(?,?,?,?)";
+	sqlite3_stmt* p_statement;
+	int result;
 
 	if(__init()<0)
 		return -1;
@@ -206,25 +221,38 @@ int _svc_db_add_app(const char *op, const char *mime_type, const char *uri, cons
 	else
 		strncpy(u,uri,URI_MAX_LEN-1);
 
-	query = sqlite3_mprintf("insert into appsvc( operation, mime_type, uri, pkg_name) \
-		values(%Q,%Q,%Q,%Q)",op,m,u,pkg_name);
 
-	if (SQLITE_OK != sqlite3_exec(svc_db, query, NULL, NULL, &error_message))
-	{
-	 	_E("Don't execute query = %s, error message = %s\n", query, error_message);
-		sqlite3_free(query);
+    result = sqlite3_prepare_v2(svc_db, insert_query, strlen(insert_query), &p_statement, NULL);
+    if (result != SQLITE_OK) {
+        _E("Sqlite3 error [%d] : <%s> preparing <%s> querry\n", result, sqlite3_errmsg(svc_db), insert_query);
 		return -1;
+    }
+
+	sqlite3_bind_text(p_statement, 1, op, -1, SQLITE_TRANSIENT);
+	sqlite3_bind_text(p_statement, 2, m, -1, SQLITE_TRANSIENT);
+	sqlite3_bind_text(p_statement, 3, u, -1, SQLITE_TRANSIENT);
+	sqlite3_bind_text(p_statement, 4, pkg_name, -1, SQLITE_TRANSIENT);
+
+
+	result = sqlite3_step(p_statement);
+	if (result != SQLITE_DONE) {
+		_E("Sqlite3 error [%d] : <%s> executing statement\n", result, sqlite3_errmsg(svc_db));
+	}
+
+	result = sqlite3_finalize(p_statement);
+	if (result != SQLITE_OK) {
+		_E("Sqlite3 error [%d] : <%s> finalizing statement\n", result, sqlite3_errmsg(svc_db));
 	}
 
 	__fini();
-	sqlite3_free(query);
 	return 0;
 }
 
 int _svc_db_delete_with_pkgname(const char *pkg_name)
 {
-	char *query;
-	char* error_message = NULL;
+	const char delete_query[] = "delete from appsvc where pkg_name = ?;";
+	sqlite3_stmt* p_statement;
+	int result;
 
 	if(pkg_name == NULL) {
 		_E("Invalid argument: data to delete is NULL\n");
@@ -234,17 +262,47 @@ int _svc_db_delete_with_pkgname(const char *pkg_name)
 	if(__init()<0)
 		return -1;
 
-	query = sqlite3_mprintf("delete from appsvc where pkg_name = %Q;", pkg_name);
+	result = sqlite3_prepare_v2(svc_db, delete_query, strlen(delete_query), &p_statement, NULL);
+	if (result != SQLITE_OK) {
+		_E("Sqlite3 error [%d] : <%s> preparing <%s> querry\n", result, sqlite3_errmsg(svc_db), delete_query);
+		return -1;
+	}
+
+	sqlite3_bind_text(p_statement, 1, pkg_name, -1, SQLITE_TRANSIENT);
+
+	result = sqlite3_step(p_statement);
+	if (result != SQLITE_DONE) {
+		_E("Sqlite3 error [%d] : <%s> executing statement\n", result, sqlite3_errmsg(svc_db));
+	}
+
+	result = sqlite3_finalize(p_statement);
+	if (result != SQLITE_OK) {
+		_E("Sqlite3 error [%d] : <%s> finalizing statement\n", result, sqlite3_errmsg(svc_db));
+	}
+
+	__fini();
+
+	return 0;
+}
+
+int _svc_db_delete_all()
+{
+	char query[QUERY_MAX_LEN];
+	char* error_message = NULL;
+
+	if(__init()<0)
+		return -1;
+
+	snprintf(query, QUERY_MAX_LEN, "delete from appsvc;");
 
 	if (SQLITE_OK != sqlite3_exec(svc_db, query, NULL, NULL, &error_message))
 	{
 	 	_E("Don't execute query = %s, error message = %s\n", query, error_message);
-		sqlite3_free(query);
 		return -1;
 	}
 
 	__fini();
-	sqlite3_free(query);
+
 	return 0;
 }
 
@@ -268,6 +326,7 @@ int _svc_db_is_defapp(const char *pkg_name)
 
 	ret = sqlite3_prepare(svc_db, query, sizeof(query), &stmt, NULL);
 	if (ret != SQLITE_OK) {
+		_E("prepare error, ret = %d, extended = %d\n", ret, sqlite3_extended_errcode(svc_db));
 		return -1;
 	}
 
@@ -320,9 +379,8 @@ char* _svc_db_get_app(const char *op, const char *mime_type, const char *uri)
 	SECURE_LOGD("query : %s\n",query);
 
 	ret = sqlite3_prepare(svc_db, query, strlen(query), &stmt, NULL);
-
 	if ( ret != SQLITE_OK) {
-		_E("prepare error(%d)\n", ret);
+		_E("prepare error, ret = %d, extended = %d\n", ret, sqlite3_extended_errcode(svc_db));
 		goto db_fini;
 	}
 
@@ -352,7 +410,7 @@ db_fini :
 	return ret_val;
 }
 
-int _svc_db_get_list_with_collation(char *op, char *uri, char *mime, GSList **pkg_list)
+int _svc_db_get_list_with_condition(char *op, char *uri, char *mime, GSList **pkg_list)
 {
 	char query[QUERY_MAX_LEN];
 	sqlite3_stmt* stmt;
@@ -365,18 +423,17 @@ int _svc_db_get_list_with_collation(char *op, char *uri, char *mime, GSList **pk
 	if(__init_app_info_db()<0)
 		return 0;
 
-	snprintf(query, QUERY_MAX_LEN, "select package from app_info where x_slp_svc='%s|%s|%s' collate appsvc_collation", op,uri,mime);
+	snprintf(query, QUERY_MAX_LEN, "select ac.app_id from package_app_app_control as ac, package_app_info ai where ac.app_id = ai.app_id and ac.app_control like '%%%s|%s|%s%%' and ai.app_disable='false'", op,uri,mime);
 	SECURE_LOGD("query : %s\n",query);
 
 	ret = sqlite3_prepare(app_info_db, query, strlen(query), &stmt, NULL);
-
 	if ( ret != SQLITE_OK) {
-		_E("prepare error\n");
+		_E("prepare error, ret = %d, extended = %d\n", ret, sqlite3_extended_errcode(app_info_db));
 		return -1;
 	}
 
 	while (sqlite3_step(stmt) == SQLITE_ROW) {
-		str = sqlite3_column_text(stmt, 0);
+		str = (char *)sqlite3_column_text(stmt, 0);
 		found = 0;
 		for (iter = *pkg_list; iter != NULL; iter = g_slist_next(iter)) {
 			pkgname = (char *)iter->data;
@@ -397,4 +454,90 @@ int _svc_db_get_list_with_collation(char *op, char *uri, char *mime, GSList **pk
 	return 0;
 }
 
+int _svc_db_get_list_with_collation(char *op, char *uri, char *mime, GSList **pkg_list)
+{
+	char query[QUERY_MAX_LEN];
+	sqlite3_stmt* stmt;
+	int ret;
+	GSList *iter = NULL;
+	char *str = NULL;
+	char *pkgname = NULL;
+	int found;
+
+	if(__init_app_info_db()<0)
+		return 0;
+
+	snprintf(query, QUERY_MAX_LEN, "select ac.app_id from package_app_app_control as ac, package_app_info ai where ac.app_id = ai.app_id and ac.app_control='%s|%s|%s' collate appsvc_collation and ai.app_disable='false'", op,uri,mime);
+	SECURE_LOGD("query : %s\n",query);
+
+	ret = sqlite3_prepare(app_info_db, query, strlen(query), &stmt, NULL);
+	if ( ret != SQLITE_OK) {
+		_E("prepare error, ret = %d, extended = %d\n", ret, sqlite3_extended_errcode(app_info_db));
+		return -1;
+	}
+
+	while (sqlite3_step(stmt) == SQLITE_ROW) {
+		str = (char *)sqlite3_column_text(stmt, 0);
+		found = 0;
+		for (iter = *pkg_list; iter != NULL; iter = g_slist_next(iter)) {
+			pkgname = (char *)iter->data;
+			if (strncmp(str,pkgname, MAX_PACKAGE_STR_SIZE-1) == 0) {
+				found = 1;
+				break;
+			}
+		}
+		if(found == 0) {
+			pkgname = strdup(str);
+			*pkg_list = g_slist_append(*pkg_list, (void *)pkgname);
+			_D("%s is added",pkgname);
+		}
+	}
+
+	ret = sqlite3_finalize(stmt);
+
+	return 0;
+}
+
+int _svc_db_get_list_with_all_defapps(GSList **pkg_list)
+{
+	char query[QUERY_MAX_LEN];
+	sqlite3_stmt* stmt;
+	int ret;
+	GSList *iter = NULL;
+	char *str = NULL;
+	char *pkgname = NULL;
+	int found;
+
+	if(__init()<0)
+		return 0;
+
+	snprintf(query, QUERY_MAX_LEN, "select pkg_name from appsvc");
+
+	ret = sqlite3_prepare(svc_db, query, sizeof(query), &stmt, NULL);
+	if ( ret != SQLITE_OK) {
+		_E("prepare error, ret = %d, extended = %d\n", ret, sqlite3_extended_errcode(svc_db));
+		return -1;
+	}
+
+	while (sqlite3_step(stmt) == SQLITE_ROW) {
+		str = (char *)sqlite3_column_text(stmt, 0);
+		found = 0;
+		for (iter = *pkg_list; iter != NULL; iter = g_slist_next(iter)) {
+			pkgname = (char *)iter->data;
+			if (strncmp(str,pkgname, MAX_PACKAGE_STR_SIZE-1) == 0) {
+				found = 1;
+				break;
+			}
+		}
+		if(found == 0) {
+			pkgname = strdup(str);
+			*pkg_list = g_slist_append(*pkg_list, (void *)pkgname);
+			_D("[%s] is def app",pkgname);
+		}
+	}
+
+	ret = sqlite3_finalize(stmt);
+
+	return 0;
+}
 

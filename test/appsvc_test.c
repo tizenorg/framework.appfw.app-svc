@@ -56,23 +56,23 @@ void __set_bundle_from_args(bundle * kb)
 	while( (opt = getopt(gargc,gargv,"d:o:m:u:p:c:")) != -1){
 		switch(opt) {
 			case 'o':
-				if(optarg)
+				if(optarg && !op)
 					op = strdup(optarg);
 				break;
 			case 'm':
-				if(optarg)
+				if(optarg && !mime)
 					mime = strdup(optarg);
 				break;
 			case 'u':
-				if(optarg)
+				if(optarg && !uri)
 					uri = strdup(optarg);
 				break;
 			case 'p':
-				if(optarg)
+				if(optarg && !package)
 					package = strdup(optarg);
 				break;
 			case 'c':
-				if(optarg)
+				if(optarg && !category)
 					category = strdup(optarg);
 				break;
 			case 'd':
