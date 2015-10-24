@@ -87,7 +87,7 @@ extern "C" {
 #define APPSVC_OPERATION_FONT_TYPE		"http://tizen.org/appcontrol/operation/configure/font/type"
 /** APP_SVC OPERATION TYPE*/
 #define APPSVC_OPERATION_FONT_SIZE		"http://tizen.org/appcontrol/operation/configure/font/size"
-
+#define APPSVC_OPERATION_LAUNCH_ON_EVENT	"http://tizen.org/appcontrol/operation/launch_on_event"
 
 
 
@@ -125,6 +125,12 @@ extern "C" {
 #endif
 
 #define APP_SELECTOR "org.tizen.app-selector"
+
+/** Internal operation for launching application which is other zone */
+#define APP_SVC_OPERATION_JUMP	"http://tizen.org/appcontrol/operation/jump"
+#define APP_SVC_K_JUMP_ZONE_NAME	"__K_JUMP_DOMAIN_NAME__"
+#define APP_SVC_K_JUMP_ORIGIN_OPERATION	"__K_JUMP_ORIGIN_OPERATION__"
+#define APP_SVC_K_FOCUS_ZONE "__K_FOCUS_ZONE__"
 
 
 /**
@@ -1014,7 +1020,7 @@ int appsvc_is_defapp(const char *appid);
 
  ...
 
- * int is_defapp_browser_app(bundle *b, char *key)
+ * int appsvc_data_is_array(bundle *b, char *key)
  * {
  *      return appsvc_data_is_array(b, key);
  * }
@@ -1028,6 +1034,61 @@ int appsvc_data_is_array(bundle *b, const char *key);
 
 int appsvc_subapp_terminate_request_pid(int pid);
 
+/**
+ * @par Description:
+ * This function sets an uri to launch application based on appsvc.
+ *
+ * @param[in] b bundle object
+ * @param[in] char *mode
+ *
+ * @return 0 if success, negative value(<0) if fail
+ * @retval APPSVC_RET_OK - success
+ * @retval APPSVC_RET_ERROR - general error
+ * @retval APPSVC_RET_EINVAL - invalid argument(content)
+ *
+ * @pre None.
+ * @post None.
+ * @see None.
+ * @remarks None.
+ *
+ * @par Sample code:
+ * @code
+#include <appsvc.h>
+
+...
+{
+	appsvc_set_launch_mode(app_control->data, mode);
+}
+ * @endcode
+ *
+ */
+int appsvc_set_launch_mode(bundle *b, const char *mode);
+
+/**
+ * @par Description:
+ * This function sets an uri to launch application based on appsvc.
+ *
+ * @param[in] b bundle object
+ *
+ * @return Pointer for launch mode string if success, NULL if fail
+ *
+ * @pre None.
+ * @post None.
+ * @see None.
+ * @remarks None.
+ *
+ * @par Sample code:
+ * @code
+#include <appsvc.h>
+
+...
+{
+	appsvc_get_launch_mode(app_control->data);
+}
+ * @endcode
+ *
+ */
+const char *appsvc_get_launch_mode(bundle *b);
 #ifdef __cplusplus
 	}
 #endif

@@ -14,18 +14,10 @@ Requires(postun): /sbin/ldconfig
 BuildRequires: cmake
 
 BuildRequires: pkgconfig(dlog)
-BuildRequires: pkgconfig(ecore) 
-BuildRequires: pkgconfig(ecore-x) 
-BuildRequires: pkgconfig(x11)
-BuildRequires: pkgconfig(libprivilege-control)
 BuildRequires: pkgconfig(bundle)
-BuildRequires: pkgconfig(dbus-glib-1)
-BuildRequires: pkgconfig(xdgmime)
 BuildRequires: pkgconfig(aul)
-BuildRequires: pkgconfig(glib-2.0)
-BuildRequires: pkgconfig(iniparser)
-BuildRequires: pkgconfig(pkgmgr-info)
-BuildRequires: pkgconfig(vconf)
+BuildRequires: pkgconfig(ecore)
+BuildRequires: pkgconfig(ecore-x)
 
 %description
 App svc
@@ -67,35 +59,13 @@ rm -rf %{buildroot}
 mkdir -p %{buildroot}/usr/share/license
 cp LICENSE %{buildroot}/usr/share/license/%{name}
 
-mkdir -p %{buildroot}/usr/share/appsvc
-cp -R %{_builddir}/%{name}-%{version}/res/arm/usr/share/appsvc/* %{buildroot}/usr/share/appsvc
-
-%post
-
-/sbin/ldconfig
-mkdir -p /opt/dbspace
-sqlite3 /opt/dbspace/.appsvc.db < /opt/share/appsvc_db.sql
-rm -rf /opt/share/appsvc_db.sql
-
-chown 0:5000 /opt/dbspace/.appsvc.db
-chown 0:5000 /opt/dbspace/.appsvc.db-journal
-chmod 664 /opt/dbspace/.appsvc.db
-chmod 664 /opt/dbspace/.appsvc.db-journal
-chsmack -a 'app-svc::db' /opt/dbspace/.appsvc.db
-chsmack -a 'app-svc::db' /opt/dbspace/.appsvc.db-journal
-
-%postun -p /sbin/ldconfig
-
 %files
 %manifest app-svc.manifest
 %defattr(-,root,root,-)
-/opt/share/appsvc_db.sql
 /opt/usr/devel/appsvc_test
 /usr/lib/libappsvc.so.0
 /usr/lib/libappsvc.so.0.1.0
 /usr/share/license/%{name}
-/usr/share/appsvc/*
-
 
 %files devel
 %defattr(-,root,root,-)

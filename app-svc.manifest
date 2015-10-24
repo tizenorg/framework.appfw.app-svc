@@ -11,7 +11,5 @@
 	<assign>
 		<filesystem path="/usr/lib/libappsvc.so.0" label="_"/>
 		<filesystem path="/usr/lib/libappsvc.so.0.1.0" label="_"/>
-		<filesystem path="/usr/share/appsvc" label="_"/>
-		<filesystem path="/usr/share/appsvc/alias.ini" label="_"/>
 	</assign>
 </manifest>

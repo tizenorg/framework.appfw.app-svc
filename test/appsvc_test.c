@@ -45,35 +45,30 @@ typedef struct _test_func_t{
 void __set_bundle_from_args(bundle * kb)
 {
 	int opt;
-	char *op = NULL;
-	char *mime = NULL;
-	char *uri = NULL;
-	char *package = NULL;
-	char *category = NULL;
 	char* key = NULL;
 	char* val_array[128];
 	
 	while( (opt = getopt(gargc,gargv,"d:o:m:u:p:c:")) != -1){
 		switch(opt) {
 			case 'o':
-				if(optarg && !op)
-					op = strdup(optarg);
+				if(optarg)
+					appsvc_set_operation(kb, optarg);
 				break;
 			case 'm':
-				if(optarg && !mime)
-					mime = strdup(optarg);
+				if(optarg)
+					appsvc_set_mime(kb,optarg);
 				break;
 			case 'u':
-				if(optarg && !uri)
-					uri = strdup(optarg);
+				if(optarg)
+					appsvc_set_uri(kb,optarg);
 				break;
 			case 'p':
-				if(optarg && !package)
-					package = strdup(optarg);
+				if(optarg)
+					appsvc_set_appid(kb,optarg);
 				break;
 			case 'c':
-				if(optarg && !category)
-					category = strdup(optarg);
+				if(optarg)
+					appsvc_set_category(kb,optarg);
 				break;
 			case 'd':
 				if(optarg){
@@ -94,27 +89,6 @@ void __set_bundle_from_args(bundle * kb)
 				break;
 		}
 	}		
-
-	if(op) {
-		appsvc_set_operation(kb,op);
-		free(op);
-	}
-	if(mime) {
-		appsvc_set_mime(kb,mime);
-		free(mime);
-	}
-	if(uri) {
-		appsvc_set_uri(kb,uri);
-		free(uri);
-	}
-	if(package) {
-		appsvc_set_appid(kb,package);
-		free(package);
-	}
-	if(category) {
-		appsvc_set_category(kb,category);
-		free(category);
-	}
 }
 
 int run_svc()

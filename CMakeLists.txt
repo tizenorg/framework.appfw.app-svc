@@ -18,13 +18,10 @@ IF("${CMAKE_BUILD_TYPE}" STREQUAL "")
 ENDIF()
 MESSAGE("Build type: ${CMAKE_BUILD_TYPE}")
 
-
 # Set required packages
 INCLUDE(FindPkgConfig)
 
-pkg_check_modules(libpkgs REQUIRED dlog bundle dbus-glib-1 xdgmime aul glib-2.0 ecore-x ecore iniparser pkgmgr-info vconf)
-
-FIND_LIBRARY(LIB_DL dl)
+pkg_check_modules(libpkgs REQUIRED dlog bundle aul ecore-x)
 
 FOREACH(flag ${libpkgs_CFLAGS})
 	SET(EXTRA_CFLAGS "${EXTRA_CFLAGS} ${flag}")
@@ -62,13 +59,10 @@ ENDIF(_APPFW_FEATURE_MULTI_WINDOW)
 SET(CMAKE_EXE_LINKER_FLAGS "-Wl,--as-needed")
 
 ### Build ###
-
 # aul
 add_library(appsvc SHARED
 		src/appsvc.c
-		src/appsvc_db.c
 		)
-TARGET_LINK_LIBRARIES(appsvc "-ldl")
 TARGET_LINK_LIBRARIES(appsvc ${libpkgs_LDFLAGS})
 SET_TARGET_PROPERTIES(appsvc PROPERTIES SOVERSION ${VERSION_MAJOR})
 SET_TARGET_PROPERTIES(appsvc PROPERTIES VERSION ${VERSION})
@@ -83,8 +77,6 @@ INSTALL(TARGETS ${AVATAR_NAME} DESTINATION bin)
 
 INSTALL(FILES ${CMAKE_CURRENT_SOURCE_DIR}/include/appsvc.h DESTINATION include/appsvc)
 INSTALL(FILES ${CMAKE_CURRENT_BINARY_DIR}/appsvc.pc DESTINATION lib/pkgconfig)
-
-INSTALL(FILES ${CMAKE_CURRENT_SOURCE_DIR}/data/appsvc_db.sql DESTINATION /opt/share )
 
 # test
 add_subdirectory(test)
